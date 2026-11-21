@@ -5,17 +5,48 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Universal Text Reader — Scroll & Page Modes</title>
 
+<style>
+/* ── Version badge ── */
+#versionTag {
+  display: inline-block;
+  font-size: 11px;
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-weight: 600;
+  color: #666;
+  background: #f0f0f0;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 2px 7px;
+  margin-left: 8px;
+  letter-spacing: 0.5px;
+  vertical-align: middle;
+  user-select: all;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+#versionTag:hover {
+  background: #e0e7ff;
+  color: #2563eb;
+  border-color: #2563eb;
+}
+#versionTag::before {
+  content: "v";
+  opacity: 0.6;
+}
+</style>
+
 <!-- CSS: primary → fallback -->
 <link rel="stylesheet"
-      href="https://cdn.jsdelivr.net/gh/math-examples/select-word@v1.0.2/css/app.css"
+      href="https://cdn.jsdelivr.net/gh/math-examples/select-word@v1.0.3/css/app.css"
       integrity="sha384-A5lx0FMcEBNFnyY8TEVX796lG4MAkdHR5mSluxBS/dI3rye2LCC6uuRXyeN9FuGH"
       crossorigin="anonymous"
-      onerror="this.onerror=null;this.href='https://gcore.jsdelivr.net/gh/math-examples/select-word@v1.0.2/css/app.css';">
+      onerror="this.onerror=null;this.href='https://gcore.jsdelivr.net/gh/math-examples/select-word@v1.0.3/css/app.css';">
 </head>
 <body>
 
 <div id="logBar">
     <span id="logText">Long press any word or character</span>
+    <span id="versionTag" title="Click to copy version"></span>
     <a id="dictLink" href="#" target="_blank" rel="noopener" hidden>📖 有道</a>
 </div>
 
@@ -42,9 +73,28 @@
 <!-- JS modules: primary → gcore → fastly, with SRI -->
 <script>
 (function() {
-  var version = 'v1.0.2';
+  var version = 'v1.0.3';
   var base = '/gh/math-examples/select-word@' + version + '/js/';
   var files = ['state.js', 'ui.js', 'scroll.js'];
+
+  // ── Display version in the badge ──
+  var tag = document.getElementById('versionTag');
+  if (tag) {
+    tag.textContent = version.replace(/^v/, '');
+    tag.addEventListener('click', function() {
+      navigator.clipboard.writeText(version).then(function() {
+        var old = tag.textContent;
+        tag.textContent = 'copied!';
+        setTimeout(function() { tag.textContent = old; }, 1000);
+      }).catch(function() {
+        // Fallback: select text
+        var range = document.createRange();
+        range.selectNode(tag);
+        window.getSelection().removeAllRanges();
+        window.getSelection().addRange(range);
+      });
+    });
+  }
 
   var sriHashes = {
     'state.js': 'sha384-8/jidUaqmf7f6GRN4cQf1q3p8Yi9AxehXvLjARJKVt+6EmE/ngqN8PtPIXOGHk1s',
