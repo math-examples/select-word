@@ -35,8 +35,7 @@ elif [ -n "${SRI_VERSION:-}" ]; then
   VERSION="$SRI_VERSION"
 else
   # Content-based version: hash of all asset files
-  # awk '{print $NF}' extracts ONLY the hex digest (not the "SHA256(stdin)=" label)
-  HASH=$(cat css/app.css js/state.js js/ui.js js/scroll.js 2>/dev/null | openssl dgst -sha256 | awk '{print $NF}' | cut -c1-12)
+  HASH=$(cat css/app.css js/state.js js/ui.js js/scroll.js 2>/dev/null | openssl dgst -sha256 2>/dev/null | awk '{print $NF}' | cut -c1-12)
   if [ -n "$HASH" ]; then
     VERSION="${HASH}"
   else
@@ -45,8 +44,12 @@ else
   fi
 fi
 
+# Ensure version starts with 'v' for URL purposes
+URL_VERSION="${VERSION}"
+[[ "${URL_VERSION}" =~ ^v ]] || URL_VERSION="v${VERSION}"
+
 # --- portable sed ---
-if [[ "$OSTYPE" == "darwin"* ]]; then
+if [[ "$OSTYPE" == darwin* ]]; then
   sedi() { sed -i '' "$@"; }
 else
   sedi() { sed -i "$@"; }
@@ -54,7 +57,7 @@ fi
 
 echo "🔐 Owner:   ${OWNER}"
 echo "🔐 Repo:    ${REPO}"
-echo "🔐 Version: ${VERSION}"
+echo "🔐 Version: ${VERSION}  (URL: ${URL_VERSION})"
 
 # ============ SRI HASHES ============
 declare -A FILE_MAP=(
@@ -82,27 +85,50 @@ done
 
 cp index.html index.html.bak
 
-sedi "s|__OWNER__|${OWNER}|g" index.html
-sedi "s|__REPO__|${REPO}|g" index.html
-sedi "s|__VERSION__|${VERSION}|g" index.html
+# --- 1. Update CSS links (primary + fallback) ---
+sedi "s|@[vV][0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*/css/app\.css|@${URL_VERSION}/css/app.css|g" index.html
 
-for key in "${!HASHES[@]}"; do
-  ph="__${key}_HASH__"
-  val="${HASHES[$key]}"
-  if [ -n "$val" ]; then
-    sedi "s|${ph}|${val}|g" index.html
-  fi
+# --- 2. Update JS base path ---
+sedi "s|/gh/[^/@]*/[^/@]*@[vV][^/]*/js/|/gh/${OWNER}/${REPO}@${URL_VERSION}/js/|g" index.html
+
+# --- 3. Update JS var version line ---
+sedi "s|var version = '[vV][^']*'|var version = '${URL_VERSION}'|g" index.html
+
+# --- 4. Update SRI integrity on <link> tags ---
+if [ -n "${HASHES[CSS]:-}" ]; then
+  sedi "s|integrity=\"[^\"]*\"|integrity=\"${HASHES[CSS]}\"|g" index.html
+fi
+
+# --- 5. Update JS sriHashes object values ---
+for filepath in "${!FILE_MAP[@]}"; do
+  key="${FILE_MAP[$filepath]}"
+  val="${HASHES[$key]:-}"
+  [ -z "$val" ] && continue
+
+  filename=$(basename "$filepath")
+  esc_val=$(printf '%s' "$val" | sed 's|/|\\/|g')
+  sedi "/'${filename}':/s|'sha384-[^']*'|'${esc_val}'|g" index.html
 done
 
-# Diff summary
+# --- 6. Update owner/repo in all CDN URLs ---
+sedi "s|/gh/[a-zA-Z0-9_.-]*/[a-zA-Z0-9_.-]*@|/gh/${OWNER}/${REPO}@|g" index.html
+
+# --- 7. Update gcore fallback URLs ---
+sedi "s|gcore\.jsdelivr\.net/gh/[a-zA-Z0-9_.-]*/[a-zA-Z0-9_.-]*@|gcore.jsdelivr.net/gh/${OWNER}/${REPO}@|g" index.html
+
+# ============ DIFF SUMMARY ============
+echo ""
+echo "  📝 Changes:"
+echo "─────────────────────────────────────────────"
 if command -v diff &>/dev/null; then
-  echo "  📝 Changes:"
-  diff -u index.html.bak index.html | grep '^[+-]' | grep -v '^---\|^+++' | head -20 || true
+  diff -u index.html.bak index.html | grep '^[+-]' | grep -v '^---\|^+++' | head -30 || true
 fi
+echo "─────────────────────────────────────────────"
 rm -f index.html.bak
 
-echo "✅ index.html updated → ${OWNER}/${REPO}@${VERSION}"
+echo ""
+echo "✅ index.html updated → ${OWNER}/${REPO}@${URL_VERSION}"
 echo ""
 echo "SRI_OWNER=${OWNER}"
 echo "SRI_REPO=${REPO}"
-echo "SRI_VERSION=${VERSION}"
+echo "SRI_VERSION=${URL_VERSION}"
