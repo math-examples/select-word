@@ -5,10 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Universal Text Reader — Scroll & Page Modes</title>
 
-<!-- CSS: primary CDN → fallback CDN -->
+<!-- CSS: primary → fallback -->
 <link rel="stylesheet"
-      href="https://cdn.jsdelivr.net/gh/math-examples/select-word@v1.0.0/app.css"
-      onerror="this.onerror=null;this.href='https://gcore.jsdelivr.net/gh/math-examples/select-word@v1.0.0/app.css';">
+      href="https://cdn.jsdelivr.net/gh/math-examples/select-word@v1.0.1/css/app.css"
+      integrity="sha384-A5lx0FMcEBNFnyY8TEVX796lG4MAkdHR5mSluxBS/dI3rye2LCC6uuRXyeN9FuGH"
+      crossorigin="anonymous"
+      onerror="this.onerror=null;this.href='https://gcore.jsdelivr.net/gh/math-examples/select-word@v1.0.1/css/app.css';">
 </head>
 <body>
 
@@ -37,36 +39,57 @@
 </div>
 <p class="hint" id="modeHint">Long press (600ms) to select a word · tap once to reveal scrubber · drag to jump</p>
 
-<!-- JS: primary → gcore → fastly fallback -->
+<!-- JS modules: primary → gcore → fastly, with SRI -->
 <script>
 (function() {
-  var version = 'v1.0.0';
-  var path = '/gh/math-examples/select-word@' + version + '/app.js';
-  var cdns = [
-    'https://cdn.jsdelivr.net' + path,
-    'https://gcore.jsdelivr.net' + path,
-    'https://fastly.jsdelivr.net' + path
-  ];
-  var i = 0;
-  var script = document.createElement('script');
+  var version = 'v1.0.1';
+  var base = '/gh/math-examples/select-word@' + version + '/js/';
+  var files = ['state.js', 'ui.js', 'scroll.js'];
 
-  function loadNext() {
-    if (i >= cdns.length) {
-      console.error('All CDNs failed to load app.js');
-      document.getElementById('loadingIndicator').textContent = 'Failed to load app. Check connection.';
+  var sriHashes = {
+    'state.js': 'sha384-8/jidUaqmf7f6GRN4cQf1q3p8Yi9AxehXvLjARJKVt+6EmE/ngqN8PtPIXOGHk1s',
+    'ui.js':    'sha384-8/uOhsLbJ1EsrpLqNJz0L9DRmaqsyhR5Ev83MeZefCkHa76xbeXesDxXhBoaUMD8',
+    'scroll.js':'sha384-jyvdQQKZgEbA0EAeMbkskXQMJpb9D7Tzyz3phWZlERrbNs/GUckfsDYfrSukhxEy'
+  };
+
+  var cdns = [
+    'https://cdn.jsdelivr.net',
+    'https://gcore.jsdelivr.net',
+    'https://fastly.jsdelivr.net'
+  ];
+
+  function loadScript(filename, retries) {
+    retries = retries || 0;
+    if (retries >= cdns.length) {
+      console.error('All CDNs failed for', filename);
+      document.getElementById('loadingIndicator').textContent = 'Failed to load ' + filename;
       document.getElementById('loadingIndicator').style.display = 'block';
       return;
     }
-    script.src = cdns[i++];
+
+    var script = document.createElement('script');
+    script.src = cdns[retries] + base + filename;
+    if (sriHashes[filename] && sriHashes[filename].indexOf('__') !== 0) {
+      script.integrity = sriHashes[filename];
+      script.crossOrigin = 'anonymous';
+    }
+
+    script.onload = function() {
+      loaded++;
+      if (loaded === files.length) {
+        console.log('✓ All modules loaded');
+      }
+    };
+
+    script.onerror = function() {
+      loadScript(filename, retries + 1);
+    };
+
+    document.head.appendChild(script);
   }
 
-  script.onerror = loadNext;
-  script.onload = function() {
-    console.log('✓ Loaded from:', script.src);
-  };
-
-  loadNext();
-  document.head.appendChild(script);
+  var loaded = 0;
+  files.forEach(function(f) { loadScript(f); });
 })();
 </script>
 
