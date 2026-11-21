@@ -1,16 +1,74 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Welcome</title>
-  <style>
-    body { font-family: system-ui; max-width: 800px; margin: 4rem auto; padding: 0 2rem; }
-    h1 { color: #0969da; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Universal Text Reader — Scroll & Page Modes</title>
+
+<!-- CSS: primary CDN → fallback CDN -->
+<link rel="stylesheet"
+      href="https://cdn.jsdelivr.net/gh/math-examples/select-word@v1.0.0/app.css"
+      onerror="this.onerror=null;this.href='https://gcore.jsdelivr.net/gh/math-examples/select-word@v1.0.0/app.css';">
 </head>
 <body>
-  <h1>🚀 Site is live</h1>
-  <p>Push changes to this branch and GitHub Pages updates automatically.</p>
+
+<div id="logBar">
+    <span id="logText">Long press any word or character</span>
+    <a id="dictLink" href="#" target="_blank" rel="noopener" hidden>📖 有道</a>
+</div>
+
+<div id="editor"></div>
+<div id="loadingIndicator">Loading…</div>
+<div id="pageIndicator"></div>
+
+<div id="scrubber">
+    <div id="scrubTrack">
+        <div id="scrubFill"></div>
+        <div id="scrubKnob"></div>
+        <div id="scrubLabel">0%</div>
+    </div>
+</div>
+
+<div class="controls">
+    <label for="fileInput">📂 Load File</label>
+    <input type="file" id="fileInput" accept=".txt,.text,.md">
+    <button id="loadSample">Sample</button>
+    <button id="modeToggle" class="mode-btn">📖 Page Mode</button>
+</div>
+<p class="hint" id="modeHint">Long press (600ms) to select a word · tap once to reveal scrubber · drag to jump</p>
+
+<!-- JS: primary → gcore → fastly fallback -->
+<script>
+(function() {
+  var version = 'v1.0.0';
+  var path = '/gh/math-examples/select-word@' + version + '/app.js';
+  var cdns = [
+    'https://cdn.jsdelivr.net' + path,
+    'https://gcore.jsdelivr.net' + path,
+    'https://fastly.jsdelivr.net' + path
+  ];
+  var i = 0;
+  var script = document.createElement('script');
+
+  function loadNext() {
+    if (i >= cdns.length) {
+      console.error('All CDNs failed to load app.js');
+      document.getElementById('loadingIndicator').textContent = 'Failed to load app. Check connection.';
+      document.getElementById('loadingIndicator').style.display = 'block';
+      return;
+    }
+    script.src = cdns[i++];
+  }
+
+  script.onerror = loadNext;
+  script.onload = function() {
+    console.log('✓ Loaded from:', script.src);
+  };
+
+  loadNext();
+  document.head.appendChild(script);
+})();
+</script>
+
 </body>
 </html>
