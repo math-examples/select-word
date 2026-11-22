@@ -1,23 +1,29 @@
 #!/usr/bin/env bash
 # setup.sh — Compute SRI hashes + update index.html in-place
 # Usage:
-#   ./setup.sh                    # auto-detect all (content-hash version)
-#   ./setup.sh user repo          # specify user + repo
-#   ./setup.sh user repo v1.0.0   # explicit version/tag
+#   ./setup.sh                    # auto-detect owner/repo; content-hash version
+#   ./setup.sh user repo          # specify owner + repo
+#   ./setup.sh user repo v1.0.0   # specify owner + repo + version
+# Does NOT commit or push.
 
 set -euo pipefail
 
-# ============ AUTO-DETECT ============
-REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
-[ -z "$REPO_ROOT" ] && echo "❌ Not inside a git repo" && exit 1
+# ============ REPOSITORY ============
+REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || true)
+if [ -z "$REPO_ROOT" ]; then
+  echo "❌ Not inside a git repo" >&2
+  exit 1
+fi
 cd "$REPO_ROOT"
 
-# --- Owner / Repo resolution ---
+# --- Owner / repo resolution ---
 if [ -n "${1:-}" ]; then
   OWNER="$1"
 else
-  OWNER="${GITHUB_OWNER:-$(git remote get-url origin 2>/dev/null | sed -n 's|.*[:/]\([^/]*\)/\([^./]*\).*|\1|p' | head -1)}"
-  [ -z "$OWNER" ] && OWNER="$(basename "$(dirname "$REPO_ROOT")")"
+  OWNER="${GITHUB_OWNER:-$(git remote get-url origin 2>/dev/null \
+    | sed -n 's|.*[:/]\([^/]*\)/\([^./]*\).*|\1|p' \
+    | head -1)}"
+  [ -n "$OWNER" ] || OWNER="$(basename "$(dirname "$REPO_ROOT")")"
 fi
 
 if [ -n "${2:-}" ]; then
@@ -27,24 +33,31 @@ else
 fi
 
 # --- Version resolution ---
+# Priority: argument > environment > content hash > date fallback
 if [ -n "${3:-}" ]; then
   VERSION="$3"
 elif [ -n "${SRI_VERSION:-}" ]; then
   VERSION="$SRI_VERSION"
 else
-  HASH=$(cat css/app.css js/state.js js/ui.js js/scroll.js js/loader.js 2>/dev/null | openssl dgst -sha256 2>/dev/null | awk '{print $NF}' | cut -c1-12)
+  HASH=$(
+    cat css/app.css js/state.js js/ui.js js/scroll.js js/loader.js 2>/dev/null \
+      | openssl dgst -sha256 2>/dev/null \
+      | awk '{print $NF}' \
+      | cut -c1-12
+  )
+
   if [ -n "$HASH" ]; then
-    VERSION="${HASH}"
+    VERSION="$HASH"
   else
     VERSION="$(date -u +%Y%m%d%H%M%S)"
   fi
 fi
 
-URL_VERSION="${VERSION}"
-[[ "${URL_VERSION}" =~ ^v ]] || URL_VERSION="v${VERSION}"
+URL_VERSION="$VERSION"
+[[ "$URL_VERSION" =~ ^[vV] ]] || URL_VERSION="v${VERSION}"
 
-# --- portable sed ---
-if [[ "$OSTYPE" == darwin* ]]; then
+# --- Portable in-place sed ---
+if [[ "${OSTYPE:-}" == darwin* ]]; then
   sedi() { sed -i '' "$@"; }
 else
   sedi() { sed -i "$@"; }
@@ -52,65 +65,81 @@ fi
 
 echo "🔐 Owner:   ${OWNER}"
 echo "🔐 Repo:    ${REPO}"
-echo "🔐 Version: ${VERSION}  (URL: ${URL_VERSION})"
+echo "🔐 Version: ${URL_VERSION}"
 
 # ============ SRI HASHES ============
-ASSETS=("css/app.css" "js/state.js" "js/ui.js" "js/scroll.js" "js/loader.js")
+declare -A FILE_MAP=(
+  ["css/app.css"]="CSS"
+  ["js/loader.js"]="LOADER"
+  ["js/state.js"]="STATE"
+  ["js/ui.js"]="UI"
+  ["js/scroll.js"]="SCROLL"
+)
+
 declare -A HASHES
 
-for filepath in "${ASSETS[@]}"; do
+for filepath in "${!FILE_MAP[@]}"; do
+  key="${FILE_MAP[$filepath]}"
+
   if [ -f "$filepath" ]; then
     hash=$(openssl dgst -sha384 -binary "$filepath" | openssl base64 -A)
-    HASHES[$filepath]="sha384-${hash}"
+    HASHES[$key]="sha384-${hash}"
     echo "  ✅ ${filepath} → sha384-${hash:0:20}..."
   else
-    HASHES[$filepath]=""
-    echo "  ⚠️  ${filepath} not found, skipping"
+    HASHES[$key]=""
+    echo "  ⚠️  ${filepath} not found; its HTML hash will be left unchanged"
   fi
 done
 
 # ============ UPDATE index.html ============
-[ ! -f "index.html" ] && echo "❌ index.html not found" && exit 1
+if [ ! -f index.html ]; then
+  echo "❌ index.html not found" >&2
+  exit 1
+fi
+
 cp index.html index.html.bak
 
-# --- 1. Update window.__APP_CONFIG__ block ---
-sedi "/window\.__APP_CONFIG__ = {/,/^};/s|version: '[vV][^']*'|version: '${URL_VERSION}'|" index.html
-sedi "/window\.__APP_CONFIG__ = {/,/^};/s|base: '/gh/[^']*'|base: '/gh/${OWNER}/${REPO}@'|" index.html
+# --- Update app config version ---
+sedi "s|version: '[^']*'|version: '${URL_VERSION}'|g" index.html
 
-for jsfile in state.js ui.js scroll.js; do
-  val="${HASHES[js/${jsfile}]:-}"
-  [ -z "$val" ] && continue
-  # Use perl-compatible replacement for safety with special chars
-  if [[ "$OSTYPE" == darwin* ]]; then
-    sed -i '' "/window\.__APP_CONFIG__ = {/,/^};/s|'${jsfile}': '[a-zA-Z0-9_-]*'|'${jsfile}': '${val}'|" index.html
-  else
-    sed -i "/window\.__APP_CONFIG__ = {/,/^};/s|'${jsfile}': '[a-zA-Z0-9_-]*'|'${jsfile}': '${val}'|" index.html
-  fi
+# --- Update owner/repo in CDN URLs and config base path ---
+sedi "s|/gh/[a-zA-Z0-9_.-]*/[a-zA-Z0-9_.-]*@|/gh/${OWNER}/${REPO}@|g" index.html
+
+# --- Update versioned CSS and JS CDN paths ---
+sedi "s|@[^/]*/css/app\.css|@${URL_VERSION}/css/app.css|g" index.html
+sedi "s|@[^/]*/js/|@${URL_VERSION}/js/|g" index.html
+
+# --- Update CSS integrity in the stylesheet link ---
+if [ -n "${HASHES[CSS]:-}" ]; then
+  sedi "/<link rel=\"stylesheet\"/,/crossorigin=/ s|integrity=\"[^\"]*\"|integrity=\"${HASHES[CSS]}\"|" index.html
+fi
+
+# --- Update loader.js integrity ---
+# The range starts on the script line containing loader.js and ends at crossorigin.
+if [ -n "${HASHES[LOADER]:-}" ]; then
+  sedi "/loader\.js/,/crossorigin=/ s|integrity=\"[^\"]*\"|integrity=\"${HASHES[LOADER]}\"|" index.html
+fi
+
+# --- Update the sriHashes object entries ---
+for filepath in js/state.js js/ui.js js/scroll.js; do
+  key="${FILE_MAP[$filepath]}"
+  val="${HASHES[$key]:-}"
+  [ -n "$val" ] || continue
+
+  filename=$(basename "$filepath")
+  sedi "/'${filename}':/ s|'sha384-[^']*'|'${val}'|g" index.html
 done
-
-# --- 2. Update ALL /gh/owner/repo@version paths globally ---
-sedi "s|/gh/[^/]*/[^@]*@[vV][^/\"]*|/gh/${OWNER}/${REPO}@${URL_VERSION}|g" index.html
-
-# --- 3. Update CSS <link> integrity (replace the entire integrity value) ---
-CSS_HASH="${HASHES[css/app.css]:-}"
-if [ -n "$CSS_HASH" ]; then
-  sedi "/app\.css/s|integrity=\"[^\"]*\"|integrity=\"${CSS_HASH}\"|" index.html
-fi
-
-# --- 4. Update loader.js integrity — DIRECT PLACEHOLDER REPLACEMENT ---
-LOADER_HASH="${HASHES[js/loader.js]:-}"
-if [ -n "$LOADER_HASH" ]; then
-  sedi "s|sha384-loader-placeholder|${LOADER_HASH}|g" index.html
-fi
 
 # ============ DIFF SUMMARY ============
 echo ""
-echo "  📝 Changes:"
+echo "📝 Changes:"
 echo "─────────────────────────────────────────────"
-if command -v diff &>/dev/null; then
-  diff -u index.html.bak index.html | grep '^[+-]' | grep -v '^---\|^+++' | head -40 || true
-fi
+diff -u index.html.bak index.html \
+  | grep '^[+-]' \
+  | grep -v '^---\|^+++' \
+  | head -30 || true
 echo "─────────────────────────────────────────────"
+
 rm -f index.html.bak
 
 echo ""
