@@ -23,6 +23,7 @@
   user-select: all;
   cursor: pointer;
   transition: background 0.2s, color 0.2s;
+  flex-shrink: 0;
 }
 #versionTag:hover {
   background: #e0e7ff;
@@ -37,10 +38,10 @@
 
 <!-- CSS: primary → fallback -->
 <link rel="stylesheet"
-      href="https://cdn.jsdelivr.net/gh/math-examples/select-word@v1.0.3/css/app.css"
-      integrity="sha384-A5lx0FMcEBNFnyY8TEVX796lG4MAkdHR5mSluxBS/dI3rye2LCC6uuRXyeN9FuGH"
+      href="https://cdn.jsdelivr.net/gh/math-examples/select-word@v1.0.4/css/app.css"
+      integrity="sha384-SbyAtBYi6yzTrcSGTAu62gcv5p/k3BBqj0i7CiyCiKKAaCqnzpGLdGRAG300idPD"
       crossorigin="anonymous"
-      onerror="this.onerror=null;this.href='https://gcore.jsdelivr.net/gh/math-examples/select-word@v1.0.3/css/app.css';">
+      onerror="this.onerror=null;this.href='https://gcore.jsdelivr.net/gh/math-examples/select-word@v1.0.4/css/app.css';">
 </head>
 <body>
 
@@ -73,7 +74,7 @@
 <!-- JS modules: primary → gcore → fastly, with SRI -->
 <script>
 (function() {
-  var version = 'v1.0.3';
+  var version = 'v1.0.4';
   var base = '/gh/math-examples/select-word@' + version + '/js/';
   var files = ['state.js', 'ui.js', 'scroll.js'];
 
@@ -98,7 +99,7 @@
 
   var sriHashes = {
     'state.js': 'sha384-8/jidUaqmf7f6GRN4cQf1q3p8Yi9AxehXvLjARJKVt+6EmE/ngqN8PtPIXOGHk1s',
-    'ui.js':    'sha384-8/uOhsLbJ1EsrpLqNJz0L9DRmaqsyhR5Ev83MeZefCkHa76xbeXesDxXhBoaUMD8',
+    'ui.js':    'sha384-vpPD0VZnObKNHClJla5aRtHoLKwINaG46VjDyPv3DMKJ4MSuZnyQokmldGlGuTMa',
     'scroll.js':'sha384-jyvdQQKZgEbA0EAeMbkskXQMJpb9D7Tzyz3phWZlERrbNs/GUckfsDYfrSukhxEy'
   };
 

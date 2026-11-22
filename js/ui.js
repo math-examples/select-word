@@ -1,13 +1,20 @@
 // ============ LOG BAR ============
 function showInLog(text) {
-    const logBar = document.getElementById('logBar'), logText = document.getElementById('logText'), dictLink = document.getElementById('dictLink');
-    logText.textContent = text;
+    const logBar = document.getElementById('logBar'),
+          logText = document.getElementById('logText'),
+          dictLink = document.getElementById('dictLink');
+    // Truncate very long text for display (full text preserved for dict lookup)
+    const displayText = text.length > 40 ? text.slice(0, 37) + '…' : text;
+    logText.textContent = displayText;
+    // Store full text as data attribute for title/tooltip
+    logText.title = text;
     dictLink.href = 'https://dict.youdao.com/result?word=' + encodeURIComponent(text) + '&lang=en';
     dictLink.hidden = false;
     logBar.classList.add('flash');
     setTimeout(() => logBar.classList.remove('flash'), 400);
     if (navigator.vibrate) navigator.vibrate(30);
 }
+
 function clearPress() { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } }
 
 // ============ OFFSET HELPER ============
@@ -75,7 +82,11 @@ function initPointer() {
 }
 
 // ============ APPLE SCRUBBER ============
-const scrubber = document.getElementById('scrubber'), scrubTrack = document.getElementById('scrubTrack'), scrubFill = document.getElementById('scrubFill'), scrubKnob = document.getElementById('scrubKnob'), scrubLabel = document.getElementById('scrubLabel');
+const scrubber = document.getElementById('scrubber'),
+      scrubTrack = document.getElementById('scrubTrack'),
+      scrubFill = document.getElementById('scrubFill'),
+      scrubKnob = document.getElementById('scrubKnob'),
+      scrubLabel = document.getElementById('scrubLabel');
 let scrubHideTimer = null, dragging = false;
 
 function showScrubber() {
