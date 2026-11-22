@@ -1,3 +1,32 @@
+/* ── Version badge ── */
+#versionTag {
+  display: inline-block;
+  font-size: 11px;
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-weight: 600;
+  color: #666;
+  background: #f0f0f0;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 2px 7px;
+  margin-left: 8px;
+  letter-spacing: 0.5px;
+  vertical-align: middle;
+  user-select: all;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+  flex-shrink: 0;
+}
+#versionTag:hover {
+  background: #e0e7ff;
+  color: #2563eb;
+  border-color: #2563eb;
+}
+#versionTag::before {
+  content: "v";
+  opacity: 0.6;
+}
+
 /* ============ LOG BAR ============ */
 #logBar {
     position: fixed; top: 0; left: 0;
@@ -6,7 +35,6 @@
     display: flex; align-items: center; padding: 0 16px; gap: 12px;
     z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.15);
     transition: background 0.3s;
-    /* ↓ THE CRITICAL FIXES ↓ */
     box-sizing: border-box;
     overflow: hidden;
     min-width: 0;
@@ -29,7 +57,7 @@
 #dictLink[hidden] { display: none; }
 
 /* ============ EDITOR — SCROLL MODE (default) ============ */
-body { margin: 0; padding-top: 64px; padding-bottom: 90px; background: #fff; font-family: 'Segoe UI', Tahoma, sans-serif; font-size: 16px; }
+body { margin: 0; padding-top: 64px; padding-bottom: 90px; background: #fff; font-family: 'Segoe UI', Tahoma, sans-serif; font-size: 16px; box-sizing: border-box; }
 
 #editor {
     margin: 0 20px; padding: 20px 0; white-space: pre-wrap; word-break: break-word;
@@ -64,10 +92,9 @@ body { margin: 0; padding-top: 64px; padding-bottom: 90px; background: #fff; fon
 #scrubber {
     position: fixed; left: 50%; transform: translateX(-50%);
     bottom: 64px; width: min(440px, 86vw);
+    max-width: calc(100vw - 32px);
     z-index: 998; opacity: 0; transition: opacity 0.4s ease;
     touch-action: none;
-    /* ↓ ensure it never overlaps controls on small screens */
-    max-width: calc(100vw - 32px);
 }
 #scrubber.visible { opacity: 1; }
 
@@ -118,7 +145,6 @@ body { margin: 0; padding-top: 64px; padding-bottom: 90px; background: #fff; fon
     position: fixed; bottom: 0; left: 0; width: 100%; background: #f0f0f0;
     padding: 10px 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; border-top: 1px solid #ddd;
     box-sizing: border-box;
-    /* ↓ ensure controls stay above scrubber */
     z-index: 999;
 }
 .controls input[type="file"] { display: none; }
